@@ -1,4 +1,6 @@
 from api_client import ApiClient
+from transformer import WeatherTransformer
+
 
 client = ApiClient(base_url="https://api.open-meteo.com")
 
@@ -16,20 +18,12 @@ params = {
 }
 
 resposta = client.get("/v1/forecast", params=params)
+transformer = WeatherTransformer()
+records = transformer.transform(resposta)
 
-print("tipo da resposta:", type(resposta).__name__)
+print("quantidade de registros:", len(records))
+print("tipo de forecast_at:", type(records[0]["forecast_at"]).__name__)
+print("primeiro forecast:", records[0])
+print("ultimo forecast:", records[-1])
+print("timezone do primeiro:", records[0]["forecast_at"].tzinfo)
 
-if isinstance(resposta, dict):
-    print("chaves principais", list(resposta.keys()))
-
-    hourly = resposta.get("hourly")
-    if isinstance(hourly, dict):
-        print("chaves de hourly", list(hourly.keys()))
-
-        for key, value in hourly.items():
-            print(
-                f"hourly['{key}'] -> type: {type(value).__name__}, "
-                f"quantidade: {len(value)}"
-            )
-
-    print("hourly_units", resposta.get("hourly_units"))
