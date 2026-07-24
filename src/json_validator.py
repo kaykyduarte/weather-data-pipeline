@@ -1,8 +1,10 @@
 from typing import Any
+ExpectedType = type | tuple[type, ...]
 
 class JSONValidator:
 
-    def __init__(self, required_fields: dict[str, type]) -> None:
+
+    def __init__(self, required_fields: dict[str, ExpectedType]) -> None:
         self.required_fields = required_fields
 
 
@@ -23,7 +25,7 @@ class JSONValidator:
             issues.append(
                 {
                     "category": "empty_batch",
-                    "message": "Lote vazio. Nenhum registro foi recebido para validacao"
+                    "message": "Lote vazio. Nenhum registro foi recebido para validacao",
                 }
             )
 
@@ -60,22 +62,57 @@ class JSONValidator:
                         "record_index": index,
                         "field": field_name,
                         "category": "null_value",
-                        "message": "Campo presente, mas com valor None."
+                        "message": "Campo presente, mas com valor None.",
                     }
                 )
                 continue
 
+            is_bool_value = isinstance(value, bool)
 
-            if not isinstance(value, expected_type):
+            expects_int = (
+                expected_type is int 
+                or (isinstance(expected_type, tuple) and int in expected_type)
+            )
+
+
+            if is_bool_value and expects_int:
+                if isinstance(expected_type, tuple):
+                    expected_type_names = ", ".join(
+                        type_.__name__ for type_ in expected_type
+                    )
+
+                else:
+                    expected_type_names = expected_type.__name__
+
                 record_issues.append(
                     {
                         "record_index": index,
                         "field": field_name,
                         "category": "invalid_type",
                         "message": (
-                            f"Tipo invalido. Esperado: {expected_type.__name__}. "
+                            f"Tipo invalido. Esperado: {expected_type_names}. "
                             f"Recebido: {type(value).__name__}."
-                        )
+                        ),
+                    }
+                )
+                continue
+
+            if not isinstance(value, expected_type):
+                if isinstance(expected_type, tuple):
+                    expected_type_names = ", ".join(
+                        type_.__name__ for type_ in expected_type
+                    )
+                else:
+                    expected_type_names = expected_type.__name__
+                record_issues.append(
+                    {
+                        "record_index": index,
+                        "field": field_name,
+                        "category": "invalid_type",
+                        "message": (
+                            f"Tipo invalido. Esperado: {expected_type_names}. "
+                            f"Recebido: {type(value).__name__}."
+                        ),
                     }
                 )
 
