@@ -74,8 +74,12 @@ class JSONValidator:
                 or (isinstance(expected_type, tuple) and int in expected_type)
             )
 
+            expects_bool = (
+                expected_type is bool
+                or (isinstance(expected_type, tuple) and bool in expected_type)
+            )
 
-            if is_bool_value and expects_int:
+            if is_bool_value and expects_int and not expects_bool:
                 if isinstance(expected_type, tuple):
                     expected_type_names = ", ".join(
                         type_.__name__ for type_ in expected_type

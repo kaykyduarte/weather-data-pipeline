@@ -1,69 +1,97 @@
 from datetime import datetime
 import logging
+import time
 
-from api_client import ApiClient
-from transformer import WeatherTransformer
-from json_validator import JSONValidator
-from pipeline import WeatherPipeline
-from config import DatabaseConfig
-from database import DatabaseClient
+from src.api_client import ApiClient, ApiClientError
+from src.transformer import WeatherTransformer, WeatherTransformError
+from src.json_validator import JSONValidator
+from src.pipeline import WeatherPipeline, PipelineError
+from src.config import DatabaseConfig, ConfigError
+from src.database import DatabaseClient, DatabaseConnectionError, DatabaseWriteError
 
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+def main() -> int:
     """Executa a pipeline principal da API."""
-    config = DatabaseConfig.from_env()
 
-    api_client = ApiClient(base_url="https://api.open-meteo.com")
-    transformer = WeatherTransformer()
+    started_at = time.perf_counter()
+    try:
+        config = DatabaseConfig.from_env()
 
-    weather_schema = {
-        "forecast_at": datetime,
-        "latitude": (int, float),
-        "longitude": (int, float),
-        "temperature_c": (int, float),
-        "relative_humidity_pct": (int, float),
-        "precipitation_mm": (int, float),
-        "wind_speed_kmh": (int, float),
-    }
+        api_client = ApiClient(base_url="https://api.open-meteo.com")
+        transformer = WeatherTransformer()
 
-    validator = JSONValidator(weather_schema)
-    database_client = DatabaseClient(config)
+        weather_schema = {
+            "forecast_at": datetime,
+            "latitude": (int, float),
+            "longitude": (int, float),
+            "temperature_c": (int, float),
+            "relative_humidity_pct": (int, float),
+            "precipitation_mm": (int, float),
+            "wind_speed_kmh": (int, float),
+        }
 
-    pipeline = WeatherPipeline(
-        api_client=api_client,
-        transformer=transformer,
-        validator=validator,
-        database_client=database_client,
-    )
+        validator = JSONValidator(weather_schema)
+        database_client = DatabaseClient(config)
 
-    endpoint = "/v1/forecast"
-    params = {
-        "latitude": -23.5505,
-        "longitude": -46.6333,
-        "timezone": "America/Sao_Paulo",
-        "hourly": [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "precipitation",
-            "wind_speed_10m",
-        ],
-        "forecast_days": 1,
-    }
+        pipeline = WeatherPipeline(
+            api_client=api_client,
+            transformer=transformer,
+            validator=validator,
+            database_client=database_client,
+        )
 
-    logger.info("Iniciando execucao da pipeline de previsao do tempo.")
+        endpoint = "/v1/forecast"
+        params = {
+            "latitude": -23.5505,
+            "longitude": -46.6333,
+            "timezone": "America/Sao_Paulo",
+            "hourly": [
+                "temperature_2m",
+                "relative_humidity_2m",
+                "precipitation",
+                "wind_speed_10m",
+            ],
+            "forecast_days": 1,
+        }
 
-    result = pipeline.run(endpoint, params)
+        logger.info("Iniciando execucao da pipeline de previsao do tempo.")
 
-    log_method = logger.info if result["pipeline_passed"] else logger.warning
+        result = pipeline.run(endpoint, params)
 
-    log_method("pipeline_passed=%s", result["pipeline_passed"])
-    log_method("transformed_records=%s", result["transformed_records"])
-    log_method("persisted_records=%s", result["persisted_records"])
-    log_method("validation_passed=%s", result["validation_report"]["passed"])
-    log_method("invalid_records=%s", result["validation_report"]["invalid_records"])
-    log_method("issues=%s", len(result["validation_report"]["issues"]))
+        log_method = logger.info if result["pipeline_passed"] else logger.warning
+
+        log_method(
+            "pipeline_finished pipeline_passed=%s transformed_records=%s "
+            "persisted_records=%s validation_passed=%s invalid_records=%s issues=%s",
+            result["pipeline_passed"],
+            result["transformed_records"],
+            result["persisted_records"],
+            result["validation_report"]["passed"],
+            result["validation_report"]["invalid_records"],
+            len(result["validation_report"]["issues"]),
+        )
+
+        if not result["pipeline_passed"]:
+            return 2
+
+        return 0
+
+    except (
+        ConfigError,
+        ApiClientError,
+        WeatherTransformError,
+        PipelineError,
+        DatabaseConnectionError,
+        DatabaseWriteError,
+    ):
+        logger.exception("Falha tecnica durante execucao da pipeline.")
+        return 1
+
+    finally:
+        duration_seconds = time.perf_counter() - started_at
+        logger.info("Duracao da execucao: %.3f segundos.", duration_seconds)
 
 
 if __name__ == "__main__":
@@ -71,4 +99,4 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
-    main()
+    raise SystemExit(main())

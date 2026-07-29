@@ -1,5 +1,5 @@
 import psycopg
-from config import DatabaseConfig
+from src.config import DatabaseConfig
 from typing import Any
 
 UPSERT_WEATHER_FORECAST_SQL = """
