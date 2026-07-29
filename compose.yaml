@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: weather_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./sql/001_create_weather_forecasts.sql:/docker-entrypoint-initdb.d/001_create_weather_forecasts.sql:ro
+
+volumes:
+  postgres_data:
+
+  
