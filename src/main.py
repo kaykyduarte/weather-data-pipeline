@@ -19,7 +19,12 @@ def main() -> int:
     try:
         config = DatabaseConfig.from_env()
 
-        api_client = ApiClient(base_url="https://api.open-meteo.com")
+        api_client = ApiClient(
+            base_url="https://api.open-meteo.com",
+            timeout=10,
+            max_retries=2,
+            backoff_seconds=0.5,
+        )
         transformer = WeatherTransformer()
 
         weather_schema = {
