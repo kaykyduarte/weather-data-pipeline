@@ -6,7 +6,7 @@ from src.api_client import ApiClient, ApiClientError
 from src.transformer import WeatherTransformer, WeatherTransformError
 from src.json_validator import JSONValidator
 from src.pipeline import WeatherPipeline, PipelineError
-from src.config import DatabaseConfig, ConfigError
+from src.config import DatabaseConfig, ApiConfig, ConfigError
 from src.database import DatabaseClient, DatabaseConnectionError, DatabaseWriteError
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,14 @@ def main() -> int:
 
     started_at = time.perf_counter()
     try:
-        config = DatabaseConfig.from_env()
+        database_config = DatabaseConfig.from_env()
+        api_config = ApiConfig.from_env()
 
         api_client = ApiClient(
-            base_url="https://api.open-meteo.com",
-            timeout=10,
-            max_retries=2,
-            backoff_seconds=0.5,
+            base_url=api_config.base_url,
+            timeout=api_config.timeout,
+            max_retries=api_config.max_retries,
+            backoff_seconds=api_config.backoff_seconds,
         )
         transformer = WeatherTransformer()
 
@@ -38,7 +39,7 @@ def main() -> int:
         }
 
         validator = JSONValidator(weather_schema)
-        database_client = DatabaseClient(config)
+        database_client = DatabaseClient(database_config)
 
         pipeline = WeatherPipeline(
             api_client=api_client,
