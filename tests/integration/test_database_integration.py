@@ -1,5 +1,4 @@
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 from decimal import Decimal
 
 import pytest

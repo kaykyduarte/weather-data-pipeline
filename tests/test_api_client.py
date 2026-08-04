@@ -410,11 +410,18 @@ def test_get_does_not_retry_http_404() -> None:
 
 
 @pytest.mark.parametrize(
-    "invalid_max_retries",
-    [-1, True, 1.5],
-)
-def test_init_rejects_invalid_max_retries(invalid_max_retries: object) -> None:
-    with pytest.raises(ValueError) as exc_info:
+    ("invalid_max_retries", "expected_exception"),
+    [
+        (-1, ValueError),
+        (True, TypeError),
+        (1.5, TypeError),
+        ],
+    )
+def test_init_rejects_invalid_max_retries(
+    invalid_max_retries: object,
+    expected_exception: type[Exception],
+    ) -> None:
+    with pytest.raises(expected_exception) as exc_info:
         ApiClient(
             base_url="https://api.exemplo.com/",
             timeout=5,
@@ -422,26 +429,33 @@ def test_init_rejects_invalid_max_retries(invalid_max_retries: object) -> None:
             max_retries=invalid_max_retries,
             backoff_seconds=0,
         )
+
     message = str(exc_info.value)
 
     assert "max_retries" in message
 
 
 @pytest.mark.parametrize(
-    "invalid_backoff_seconds",
-    [-0.1, True, "abc"],
-)
+    ("invalid_backoff_seconds", "expected_exception"),
+    [
+        (-0.1, ValueError),
+        (True, TypeError),
+        ("abc", TypeError),
+        ],
+    )
 def test_init_rejects_invalid_backoff_seconds(
     invalid_backoff_seconds: object,
+    expected_exception: type[Exception],
 ) -> None:
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(expected_exception) as exc_info:
         ApiClient(
             base_url="https://api.exemplo.com/",
             timeout=5,
             headers={"Authorization": "Bearer token"},
             max_retries=0,
-            backoff_seconds=invalid_backoff_seconds,   
+            backoff_seconds=invalid_backoff_seconds,  
         )
+
     message = str(exc_info.value)
 
     assert "backoff_seconds" in message

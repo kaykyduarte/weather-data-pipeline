@@ -32,12 +32,12 @@ class ApiClient:
             backoff_seconds: Intervalo de espera entre tentativas de retry, em segundos.
         """
         if isinstance(max_retries, bool) or not isinstance(max_retries, int):
-            raise ValueError("max_retries deve ser um int nao negativo")
+            raise TypeError("max_retries deve ser um int nao negativo")
         if max_retries < 0:
             raise ValueError("max_retries deve ser um int nao negativo")
 
         if isinstance(backoff_seconds, bool) or not isinstance(backoff_seconds, (int, float)):
-            raise ValueError("backoff_seconds deve ser um int ou float nao negativo")
+            raise TypeError("backoff_seconds deve ser um int ou float nao negativo")
         if backoff_seconds < 0:
             raise ValueError("backoff_seconds deve ser um int ou float nao negativo")
         self.base_url = base_url.rstrip("/")
