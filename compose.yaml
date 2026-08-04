@@ -12,6 +12,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./sql/001_create_weather_forecasts.sql:/docker-entrypoint-initdb.d/001_create_weather_forecasts.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  weather_pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: weather-pipeline:local
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   postgres_data:
