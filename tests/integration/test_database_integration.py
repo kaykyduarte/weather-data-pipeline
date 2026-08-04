@@ -1,8 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
-import pytest
 import psycopg
+import pytest
 
 from src.config import DatabaseConfig
 from src.database import DatabaseClient, DatabaseWriteError
@@ -17,36 +17,37 @@ def test_database_client_connects_to_real_postgres() -> None:
 
     assert result is None
 
+
 @pytest.mark.integration
 def test_upsert_forecasts_is_idempotent_and_updates_measurements() -> None:
     config = DatabaseConfig.from_env()
     client = DatabaseClient(config)
 
-    forecast_at = datetime.now(timezone.utc).replace(microsecond=0)
+    forecast_at = datetime.now(UTC).replace(microsecond=0)
     latitude = Decimal("66.6666")
     longitude = Decimal("-140.1401")
     try:
         first_record = {
-                "forecast_at": forecast_at,
-                "latitude": latitude,
-                "longitude": longitude,
-                "temperature_c": Decimal("18.5"),
-                "relative_humidity_pct": 80,
-                "precipitation_mm": Decimal("0.0"),
-                "wind_speed_kmh": Decimal("12.4"),
+            "forecast_at": forecast_at,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature_c": Decimal("18.5"),
+            "relative_humidity_pct": 80,
+            "precipitation_mm": Decimal("0.0"),
+            "wind_speed_kmh": Decimal("12.4"),
         }
 
         first_result = client.upsert_forecasts([first_record])
         assert first_result == 1
 
         second_record = {
-                "forecast_at": forecast_at,
-                "latitude": latitude,
-                "longitude": longitude,
-                "temperature_c": Decimal("21.3"),
-                "relative_humidity_pct": 77,
-                "precipitation_mm": Decimal("1.2"),
-                "wind_speed_kmh": Decimal("18.9"),
+            "forecast_at": forecast_at,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature_c": Decimal("21.3"),
+            "relative_humidity_pct": 77,
+            "precipitation_mm": Decimal("1.2"),
+            "wind_speed_kmh": Decimal("18.9"),
         }
 
         second_result = client.upsert_forecasts([second_record])
@@ -117,7 +118,7 @@ def test_upsert_forecasts_rolls_back_entire_batch_when_one_record_is_invalid() -
     config = DatabaseConfig.from_env()
     client = DatabaseClient(config)
 
-    forecast_at = datetime.now(timezone.utc).replace(microsecond=0)
+    forecast_at = datetime.now(UTC).replace(microsecond=0)
     latitude = Decimal("55.5555")
     longitude = Decimal("-120.1202")
 
@@ -125,36 +126,36 @@ def test_upsert_forecasts_rolls_back_entire_batch_when_one_record_is_invalid() -
 
     try:
         initial_record = {
-                "forecast_at": forecast_at,
-                "latitude": latitude,
-                "longitude": longitude,
-                "temperature_c": Decimal("18.5"),
-                "relative_humidity_pct": 80,
-                "precipitation_mm": Decimal("0.0"),
-                "wind_speed_kmh": Decimal("12.4"),
+            "forecast_at": forecast_at,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature_c": Decimal("18.5"),
+            "relative_humidity_pct": 80,
+            "precipitation_mm": Decimal("0.0"),
+            "wind_speed_kmh": Decimal("12.4"),
         }
 
         first_result = client.upsert_forecasts([initial_record])
         assert first_result == 1
 
         valid_update_record = {
-                "forecast_at": forecast_at,
-                "latitude": latitude,
-                "longitude": longitude,
-                "temperature_c": Decimal("21.3"),
-                "relative_humidity_pct": 77,
-                "precipitation_mm": Decimal("1.2"),
-                "wind_speed_kmh": Decimal("18.4"),
+            "forecast_at": forecast_at,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature_c": Decimal("21.3"),
+            "relative_humidity_pct": 77,
+            "precipitation_mm": Decimal("1.2"),
+            "wind_speed_kmh": Decimal("18.4"),
         }
 
         invalid_record = {
-                "forecast_at": invalid_forecast_at,
-                "latitude": latitude,
-                "longitude": longitude,
-                "temperature_c": Decimal("19.3"),
-                "relative_humidity_pct": 101,
-                "precipitation_mm": Decimal("0.2"),
-                "wind_speed_kmh": Decimal("10.0"),
+            "forecast_at": invalid_forecast_at,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature_c": Decimal("19.3"),
+            "relative_humidity_pct": 101,
+            "precipitation_mm": Decimal("0.2"),
+            "wind_speed_kmh": Decimal("10.0"),
         }
 
         with pytest.raises(DatabaseWriteError) as exc_info:
@@ -231,4 +232,3 @@ def test_upsert_forecasts_rolls_back_entire_batch_when_one_record_is_invalid() -
                     """,
                     (latitude, longitude, invalid_forecast_at),
                 )
-        

@@ -1,13 +1,12 @@
 from unittest.mock import Mock
+
 import pytest
 
 from src.api_client import ApiClient
-from src.transformer import WeatherTransformer
-from src.json_validator import JSONValidator
 from src.database import DatabaseClient
-from src.pipeline import WeatherPipeline, PipelineError
-
-
+from src.json_validator import JSONValidator
+from src.pipeline import PipelineError, WeatherPipeline
+from src.transformer import WeatherTransformer
 
 
 def test_run_returns_success_report_and_calls_dependencies_once() -> None:
@@ -71,7 +70,7 @@ def test_run_does_not_persist_when_validation_fails() -> None:
                 "record_index": 0,
                 "field": "temperature_c",
                 "category": "invalid_type",
-                "message": "Tipo Invalido"
+                "message": "Tipo Invalido",
             }
         ],
     }

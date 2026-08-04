@@ -1,12 +1,11 @@
 from typing import Any
+
 ExpectedType = type | tuple[type, ...]
 
+
 class JSONValidator:
-
-
     def __init__(self, required_fields: dict[str, ExpectedType]) -> None:
         self.required_fields = required_fields
-
 
     def validate_json(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Valida os registros e retorna um relatorio."""
@@ -20,7 +19,7 @@ class JSONValidator:
             if record_issues:
                 invalid_records += 1
                 issues.extend(record_issues)
-            
+
         if total_records == 0:
             issues.append(
                 {
@@ -38,7 +37,9 @@ class JSONValidator:
             "issues": issues,
         }
 
-    def _validate_record(self, record: dict[str, Any], index: int) -> list[dict[str, Any]]:
+    def _validate_record(
+        self, record: dict[str, Any], index: int
+    ) -> list[dict[str, Any]]:
         """Valida um unico registro e retorna os problemas encontrados."""
         record_issues: list[dict[str, Any]] = []
 
@@ -69,14 +70,12 @@ class JSONValidator:
 
             is_bool_value = isinstance(value, bool)
 
-            expects_int = (
-                expected_type is int 
-                or (isinstance(expected_type, tuple) and int in expected_type)
+            expects_int = expected_type is int or (
+                isinstance(expected_type, tuple) and int in expected_type
             )
 
-            expects_bool = (
-                expected_type is bool
-                or (isinstance(expected_type, tuple) and bool in expected_type)
+            expects_bool = expected_type is bool or (
+                isinstance(expected_type, tuple) and bool in expected_type
             )
 
             if is_bool_value and expects_int and not expects_bool:

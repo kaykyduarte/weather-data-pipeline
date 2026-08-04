@@ -1,0 +1,7 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+extend-exclude = ["**/*.ipynb"]
+
+[tool.ruff.lint]
+ignore = ["SIM117"]

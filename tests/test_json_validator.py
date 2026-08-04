@@ -47,7 +47,7 @@ def test_validate_json_reports_null_value() -> None:
         {"id": 1, "name": None},
     ]
     validator = JSONValidator(schema)
-    
+
     report = validator.validate_json(records)
 
     assert report["passed"] is False
@@ -58,7 +58,7 @@ def test_validate_json_reports_null_value() -> None:
 
 def test_validate_json_reports_invalid_type_for_bool_when_expect_int() -> None:
     schema = {
-            "id": int,
+        "id": int,
     }
     records = [
         {"id": True},
@@ -75,8 +75,8 @@ def test_validate_json_reports_invalid_type_for_bool_when_expect_int() -> None:
 
 def test_validate_json_reports_empty_batch() -> None:
     schema = {
-            "id": int,
-            "name": str,
+        "id": int,
+        "name": str,
     }
     records = []
     validator = JSONValidator(schema)
@@ -92,15 +92,15 @@ def test_validate_json_reports_empty_batch() -> None:
 
 def test_validate_json_reports_two_issues_for_one_invalid_record() -> None:
     schema = {
-            "id": int,
-            "name": str,
+        "id": int,
+        "name": str,
     }
     records = [
         {"id": "abc"},
     ]
     validator = JSONValidator(schema)
 
-    report = validator.validate_json(records)   
+    report = validator.validate_json(records)
     categories = {issue["category"] for issue in report["issues"]}
 
     assert report["passed"] is False
@@ -109,9 +109,10 @@ def test_validate_json_reports_two_issues_for_one_invalid_record() -> None:
     assert "missing_field" in categories
     assert "invalid_type" in categories
 
-def test_validate_json_accepts_bool_when_schema_explicitly_allows_bool() -> None: 
+
+def test_validate_json_accepts_bool_when_schema_explicitly_allows_bool() -> None:
     schema = {
-        "flag": (int, bool),      
+        "flag": (int, bool),
     }
     records = [
         {"flag": True},

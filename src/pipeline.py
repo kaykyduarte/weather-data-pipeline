@@ -1,9 +1,9 @@
 from typing import Any
 
 from src.api_client import ApiClient
-from src.transformer import WeatherTransformer
-from src.json_validator import JSONValidator
 from src.database import DatabaseClient
+from src.json_validator import JSONValidator
+from src.transformer import WeatherTransformer
 
 
 class PipelineError(Exception):
@@ -13,12 +13,13 @@ class PipelineError(Exception):
 class WeatherPipeline:
     """Orquestra a coleta, transformacao, validacao e persistencia dos dados."""
 
-    def __init__(self, 
-                api_client: ApiClient, 
-                transformer: WeatherTransformer, 
-                validator: JSONValidator, 
-                database_client: DatabaseClient,
-            ) -> None:
+    def __init__(
+        self,
+        api_client: ApiClient,
+        transformer: WeatherTransformer,
+        validator: JSONValidator,
+        database_client: DatabaseClient,
+    ) -> None:
         self._api_client = api_client
         self._transformer = transformer
         self._validator = validator
@@ -41,7 +42,7 @@ class WeatherPipeline:
 
         records = self._transformer.transform(response)
         validation_report = self._validator.validate_json(records)
-        
+
         if not validation_report["passed"]:
             return {
                 "pipeline_passed": False,
@@ -58,5 +59,3 @@ class WeatherPipeline:
             "persisted_records": persisted_records,
             "validation_report": validation_report,
         }
-
-        

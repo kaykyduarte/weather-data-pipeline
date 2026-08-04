@@ -1,10 +1,16 @@
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
-import pytest
+from datetime import UTC, datetime, timezone
+from unittest.mock import MagicMock, patch
+
 import psycopg
+import pytest
 
 from src.config import DatabaseConfig
-from src.database import DatabaseClient, UPSERT_WEATHER_FORECAST_SQL, DatabaseWriteError, DatabaseConnectionError
+from src.database import (
+    UPSERT_WEATHER_FORECAST_SQL,
+    DatabaseClient,
+    DatabaseConnectionError,
+    DatabaseWriteError,
+)
 
 
 def test_upsert_forecasts_returns_zero_for_empty_input() -> None:
@@ -27,7 +33,7 @@ def test_upsert_forecasts_returns_zero_for_empty_input() -> None:
 def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
     records = [
         {
-            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=timezone.utc),
+            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
             "latitude": -23.5505,
             "longitude": -46.6333,
             "temperature_c": 18.5,
@@ -36,13 +42,13 @@ def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
             "wind_speed_kmh": 12.4,
         },
         {
-            "forecast_at": datetime(2026, 7, 29, 4, 0, tzinfo=timezone.utc),
+            "forecast_at": datetime(2026, 7, 29, 4, 0, tzinfo=UTC),
             "latitude": -23.5505,
             "longitude": -46.6333,
             "temperature_c": 17.8,
             "relative_humidity_pct": 83,
             "precipitation_mm": 0.2,
-            "wind_speed_kmh": 10.1, 
+            "wind_speed_kmh": 10.1,
         },
     ]
 
@@ -62,9 +68,10 @@ def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
     connection_mock.cursor.return_value.__enter__.return_value = cursor_mock
 
     with patch.object(
-        client, "_connect", 
+        client,
+        "_connect",
         return_value=connection_mock,
-        ) as mock_connect:
+    ) as mock_connect:
         result = client.upsert_forecasts(records)
 
     assert result == len(records)
@@ -80,25 +87,25 @@ def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
     assert len(params_list) == len(records)
 
     expected_params_list = [
-    (
-        records[0]["forecast_at"],
-        records[0]["latitude"],
-        records[0]["longitude"],
-        records[0]["temperature_c"],
-        records[0]["relative_humidity_pct"],
-        records[0]["precipitation_mm"],
-        records[0]["wind_speed_kmh"],
+        (
+            records[0]["forecast_at"],
+            records[0]["latitude"],
+            records[0]["longitude"],
+            records[0]["temperature_c"],
+            records[0]["relative_humidity_pct"],
+            records[0]["precipitation_mm"],
+            records[0]["wind_speed_kmh"],
         ),
-    (
-        records[1]["forecast_at"],
-        records[1]["latitude"],
-        records[1]["longitude"],
-        records[1]["temperature_c"],
-        records[1]["relative_humidity_pct"],
-        records[1]["precipitation_mm"],
-        records[1]["wind_speed_kmh"],
+        (
+            records[1]["forecast_at"],
+            records[1]["latitude"],
+            records[1]["longitude"],
+            records[1]["temperature_c"],
+            records[1]["relative_humidity_pct"],
+            records[1]["precipitation_mm"],
+            records[1]["wind_speed_kmh"],
         ),
-]
+    ]
 
     assert params_list == expected_params_list
     connection_mock.__exit__.assert_called_once()
@@ -108,7 +115,7 @@ def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
 def test_upsert_forecasts_converts_psycopg_error_to_database_write_error() -> None:
     records = [
         {
-            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=timezone.utc),
+            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
             "latitude": -23.5505,
             "longitude": -46.6333,
             "temperature_c": 18.5,
@@ -164,9 +171,10 @@ def test_connection_converts_psycopg_error_to_database_connection_error() -> Non
 
     connect_error = psycopg.Error("connection failed")
 
-    with patch("src.database.psycopg.connect", 
-               side_effect=connect_error,
-               ) as mock_connect:
+    with patch(
+        "src.database.psycopg.connect",
+        side_effect=connect_error,
+    ) as mock_connect:
         with pytest.raises(DatabaseConnectionError) as exc_info:
             client.test_connection()
 
@@ -217,5 +225,3 @@ def test_connection_executes_select_one_and_closes_resources() -> None:
 
     connection_mock.cursor.return_value.__exit__.assert_called_once()
     connection_mock.__exit__.assert_called_once()
-
-

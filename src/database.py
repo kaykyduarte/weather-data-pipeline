@@ -1,6 +1,8 @@
-import psycopg
-from src.config import DatabaseConfig
 from typing import Any
+
+import psycopg
+
+from src.config import DatabaseConfig
 
 UPSERT_WEATHER_FORECAST_SQL = """
 INSERT INTO weather_forecasts (
@@ -57,7 +59,6 @@ class DatabaseClient:
                 f"em {self._config.host}:{self._config.port}."
             ) from error
 
-
     def test_connection(self) -> None:
         """Testa se a conexao com o banco pode ser estabelecida."""
         try:
@@ -70,7 +71,7 @@ class DatabaseClient:
                 raise DatabaseConnectionError(
                     f"Teste de conexao ao banco '{self._config.dbname}' "
                     f"em {self._config.host}:{self._config.port} retornou resultado inesperado: {result}."
-                ) 
+                )
 
         except psycopg.Error as error:
             raise DatabaseConnectionError(

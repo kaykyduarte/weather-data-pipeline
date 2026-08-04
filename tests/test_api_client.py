@@ -1,9 +1,10 @@
-from unittest.mock import Mock, patch, call
-import requests
-import pytest
 import logging
+from unittest.mock import Mock, call, patch
 
-from  src.api_client import ApiClient, ApiClientError
+import pytest
+import requests
+
+from src.api_client import ApiClient, ApiClientError
 
 
 def test_get_returns_payload_and_calls_request_with_normalized_url() -> None:
@@ -15,7 +16,7 @@ def test_get_returns_payload_and_calls_request_with_normalized_url() -> None:
     client = ApiClient(
         base_url="https://api.exemplo.com/",
         timeout=5,
-        headers = {"Authorization": "Bearer token"},
+        headers={"Authorization": "Bearer token"},
     )
     endpoint = "/weather"
     params = {"city": "Sao Paulo"}
@@ -95,7 +96,7 @@ def test_get_converts_http_error_and_includes_status_code() -> None:
         headers={"Authorization": "Bearer token"},
         params={"city": "Sao Paulo"},
         timeout=5,
-    ) 
+    )
 
     response.raise_for_status.assert_called_once_with()
     response.json.assert_not_called()
@@ -149,7 +150,6 @@ def test_get_converts_json_decode_error_to_api_client_error() -> None:
         None,
     ],
 )
-
 def test_valid_json_with_incompatible_root(invalid_payload: object) -> None:
     response = Mock()
     response.raise_for_status.return_value = None
@@ -179,7 +179,7 @@ def test_valid_json_with_incompatible_root(invalid_payload: object) -> None:
         headers={"Authorization": "Bearer token"},
         params={"city": "Sao Paulo"},
         timeout=5,
-    )  
+    )
     response.raise_for_status.assert_called_once_with()
     response.json.assert_called_once_with()
 
@@ -228,8 +228,8 @@ def test_get_retries_timeout_and_returns_payload_on_second_attempt() -> None:
         backoff_seconds=0,
     )
 
-    with patch("src.api_client.requests.get", 
-               side_effect=[timeout_error, response]
+    with patch(
+        "src.api_client.requests.get", side_effect=[timeout_error, response]
     ) as mock_get:
         result = client.get("/weather", params={"city": "Sao Paulo"})
 
@@ -262,10 +262,13 @@ def test_get_exhausts_timeout_retries_with_exponential_backoff() -> None:
         timeout=5,
     )
 
-    with patch(
-        "src.api_client.requests.get",
-        side_effect=[timeout_error_1, timeout_error_2, timeout_error_3],
-    ) as mock_get, patch("src.api_client.time.sleep") as mock_sleep:
+    with (
+        patch(
+            "src.api_client.requests.get",
+            side_effect=[timeout_error_1, timeout_error_2, timeout_error_3],
+        ) as mock_get,
+        patch("src.api_client.time.sleep") as mock_sleep,
+    ):
         with pytest.raises(ApiClientError) as exc_info:
             client.get(endpoint, params=params)
 
@@ -384,10 +387,13 @@ def test_get_does_not_retry_http_404() -> None:
     endpoint = "/weather"
     params = {"city": "Sao Paulo"}
 
-    with patch(
-        "src.api_client.requests.get",
-        return_value=response,
-    ) as mock_get, patch("src.api_client.time.sleep") as mock_sleep:
+    with (
+        patch(
+            "src.api_client.requests.get",
+            return_value=response,
+        ) as mock_get,
+        patch("src.api_client.time.sleep") as mock_sleep,
+    ):
         with pytest.raises(ApiClientError) as exc_info:
             client.get(endpoint, params=params)
 
@@ -415,12 +421,12 @@ def test_get_does_not_retry_http_404() -> None:
         (-1, ValueError),
         (True, TypeError),
         (1.5, TypeError),
-        ],
-    )
+    ],
+)
 def test_init_rejects_invalid_max_retries(
     invalid_max_retries: object,
     expected_exception: type[Exception],
-    ) -> None:
+) -> None:
     with pytest.raises(expected_exception) as exc_info:
         ApiClient(
             base_url="https://api.exemplo.com/",
@@ -441,8 +447,8 @@ def test_init_rejects_invalid_max_retries(
         (-0.1, ValueError),
         (True, TypeError),
         ("abc", TypeError),
-        ],
-    )
+    ],
+)
 def test_init_rejects_invalid_backoff_seconds(
     invalid_backoff_seconds: object,
     expected_exception: type[Exception],
@@ -453,7 +459,7 @@ def test_init_rejects_invalid_backoff_seconds(
             timeout=5,
             headers={"Authorization": "Bearer token"},
             max_retries=0,
-            backoff_seconds=invalid_backoff_seconds,  
+            backoff_seconds=invalid_backoff_seconds,
         )
 
     message = str(exc_info.value)
@@ -479,18 +485,14 @@ def test_get_logs_warning_before_retrying_timeout(caplog) -> None:
     endpoint = "/v1/forecast"
     params = {"city": "Sao Paulo"}
 
-    with patch("src.api_client.requests.get",
-        side_effect=[timeout_error, response]
-    ):
-
+    with patch("src.api_client.requests.get", side_effect=[timeout_error, response]):
         with caplog.at_level(logging.WARNING, logger="src.api_client"):
             result = client.get(endpoint, params=params)
 
     assert result == payload
 
     warning_records = [
-        record for record in caplog.records
-        if record.levelno == logging.WARNING
+        record for record in caplog.records if record.levelno == logging.WARNING
     ]
 
     assert len(warning_records) == 1

@@ -1,8 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
+
 import pytest
 
 from src.transformer import WeatherTransformer, WeatherTransformError
+
 
 def _make_valid_response() -> dict[str, Any]:
     return {
@@ -34,14 +36,10 @@ def test_transform_returns_two_utc_records_with_preserved_index_mapping() -> Non
     second_record = records[1]
 
     assert isinstance(first_record["forecast_at"], datetime)
-    assert first_record["forecast_at"].tzinfo == timezone.utc
+    assert first_record["forecast_at"].tzinfo == UTC
 
-    assert first_record["forecast_at"] == datetime(
-        2026, 7, 29, 3, 0, tzinfo=timezone.utc
-        )
-    assert second_record["forecast_at"] == datetime(
-        2026, 7, 29, 4, 0, tzinfo=timezone.utc
-        )
+    assert first_record["forecast_at"] == datetime(2026, 7, 29, 3, 0, tzinfo=UTC)
+    assert second_record["forecast_at"] == datetime(2026, 7, 29, 4, 0, tzinfo=UTC)
 
     assert first_record["latitude"] == response["latitude"]
     assert first_record["longitude"] == response["longitude"]

@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 import pytest
 
 from src.config import ApiConfig, ConfigError
@@ -11,7 +12,9 @@ def _set_valid_api_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("API_BACKOFF_SECONDS", "0.5")
 
 
-def test_api_config_from_env_returns_typed_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_api_config_from_env_returns_typed_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _set_valid_api_environment(monkeypatch)
 
     with patch("src.config.load_dotenv", return_value=None):
@@ -95,7 +98,7 @@ def test_api_config_from_env_raises_for_invalid_numeric_format(
 def test_api_config_from_env_raises_for_out_of_range_values(
     monkeypatch: pytest.MonkeyPatch,
     variable_name: str,
-    invalid_value: str, 
+    invalid_value: str,
 ) -> None:
     _set_valid_api_environment(monkeypatch)
     monkeypatch.setenv(variable_name, invalid_value)
@@ -109,6 +112,3 @@ def test_api_config_from_env_raises_for_out_of_range_values(
     assert variable_name in message
     assert "fora do intervalo" in message
     assert exc_info.value.__cause__ is None
-
-
-

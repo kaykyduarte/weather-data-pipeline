@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
+
 from dotenv import load_dotenv
 
 
@@ -30,13 +31,15 @@ class DatabaseConfig:
             "POSTGRES_PORT": port_text,
             "POSTGRES_DB": dbname,
             "POSTGRES_USER": user,
-            "POSTGRES_PASSWORD": password
+            "POSTGRES_PASSWORD": password,
         }
 
         for field_name, field_value in required_fields.items():
             if field_value is None or not field_value.strip():
-                raise ConfigError(f"Variavel obrigatoria ausente ou vazia: {field_name}.")
-            
+                raise ConfigError(
+                    f"Variavel obrigatoria ausente ou vazia: {field_name}."
+                )
+
         try:
             port = int(port_text)
         except ValueError as error:

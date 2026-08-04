@@ -1,13 +1,15 @@
+from datetime import UTC, datetime, timezone
 from typing import Any
-from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class WeatherTransformError(Exception):
-    """ Erro de transformacao da resposta da API """
+    """Erro de transformacao da resposta da API"""
+
 
 class WeatherTransformer:
     """Transforma resposta bruta da API em registro estruturado"""
+
     REQUIRED_HOURLY_FIELDS = (
         "time",
         "temperature_2m",
@@ -45,7 +47,7 @@ class WeatherTransformer:
             raise WeatherTransformError(
                 f"Campo 'longitude' fora do intervalo valido: {longitude}."
             )
-        
+
         if "timezone" not in response:
             raise WeatherTransformError("Campo 'timezone' ausente na resposta.")
 
@@ -69,7 +71,6 @@ class WeatherTransformer:
                 f"Campo 'hourly' com tipo invalido: {type(hourly).__name__}. Era esperado dict."
             )
 
-
         field_lengths: dict[str, int] = {}
 
         for field_name in self.REQUIRED_HOURLY_FIELDS:
@@ -85,7 +86,7 @@ class WeatherTransformer:
                     f"Campo horario '{field_name}' com tipo invalido: "
                     f"{type(field_value).__name__}. Era esperado list."
                 )
-            
+
             if len(field_value) == 0:
                 raise WeatherTransformError(
                     f"Campo horario '{field_name}' retornou lista vazia."
@@ -109,7 +110,7 @@ class WeatherTransformer:
 
         records: list[dict[str, Any]] = []
         total_positions = len(hourly["time"])
-        
+
         for index in range(total_positions):
             time_text = hourly["time"][index]
 
@@ -123,7 +124,7 @@ class WeatherTransformer:
                 raise WeatherTransformError(
                     f"Valor vazio em 'time' na posicao {index}."
                 )
-            
+
             try:
                 local_dt = datetime.fromisoformat(time_text)
             except ValueError as error:
@@ -137,8 +138,8 @@ class WeatherTransformer:
                 )
 
             local_dt = local_dt.replace(tzinfo=local_tz)
-            utc_dt = local_dt.astimezone(timezone.utc)
-        
+            utc_dt = local_dt.astimezone(UTC)
+
             record = {
                 "forecast_at": utc_dt,
                 "latitude": response["latitude"],
@@ -149,8 +150,5 @@ class WeatherTransformer:
                 "wind_speed_kmh": hourly["wind_speed_10m"][index],
             }
             records.append(record)
-        
-        return records
 
-        
-        
+        return records

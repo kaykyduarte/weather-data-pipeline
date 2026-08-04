@@ -1,13 +1,15 @@
-from typing import Any
-import time
-import requests
 import logging
+import time
+from typing import Any
+
+import requests
 
 ApiResponse = dict[str, Any] | list[Any]
 logger = logging.getLogger(__name__)
 
+
 class ApiClientError(Exception):
-    """ Erro Padrao do cliente da API """
+    """Erro Padrao do cliente da API"""
 
 
 class ApiClient:
@@ -15,12 +17,13 @@ class ApiClient:
 
     RETRYABLE_STATUS_CODES = frozenset({500, 502, 503, 504})
 
-    def __init__(self, base_url: str, 
-                timeout: int = 10, 
-                headers: dict[str, str] | None = None,
-                max_retries: int = 0,
-                backoff_seconds: float = 0.0,
-
+    def __init__(
+        self,
+        base_url: str,
+        timeout: int = 10,
+        headers: dict[str, str] | None = None,
+        max_retries: int = 0,
+        backoff_seconds: float = 0.0,
     ) -> None:
         """Inicializa o cliente com configuracoes permanentes.
 
@@ -36,7 +39,9 @@ class ApiClient:
         if max_retries < 0:
             raise ValueError("max_retries deve ser um int nao negativo")
 
-        if isinstance(backoff_seconds, bool) or not isinstance(backoff_seconds, (int, float)):
+        if isinstance(backoff_seconds, bool) or not isinstance(
+            backoff_seconds, (int, float)
+        ):
             raise TypeError("backoff_seconds deve ser um int ou float nao negativo")
         if backoff_seconds < 0:
             raise ValueError("backoff_seconds deve ser um int ou float nao negativo")
@@ -46,14 +51,13 @@ class ApiClient:
         self.max_retries = max_retries
         self.backoff_seconds = backoff_seconds
 
-
     def _wait_before_next_retry(
-            self, 
-            attempt: int,
-            endpoint: str,
-            reason: str,
-            total_attempts: int,
-            ) -> None:
+        self,
+        attempt: int,
+        endpoint: str,
+        reason: str,
+        total_attempts: int,
+    ) -> None:
         delay = self.backoff_seconds * (2 ** (attempt - 1))
 
         logger.warning(
@@ -67,7 +71,6 @@ class ApiClient:
 
         if delay > 0:
             time.sleep(delay)
-
 
     def get(self, endpoint: str, params: dict[str, Any] | None = None) -> ApiResponse:
         """Busca dados em um endpoint da API.
@@ -99,15 +102,18 @@ class ApiClient:
                         f"Tipo de dado {type(data).__name__}."
                     )
                 return data
-            
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as error:
+
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            ) as error:
                 if attempt < total_attempts:
                     reason = type(error).__name__
                     self._wait_before_next_retry(
                         attempt=attempt,
                         endpoint=endpoint,
                         reason=reason,
-                        total_attempts=total_attempts
+                        total_attempts=total_attempts,
                     )
                     continue
 
@@ -117,10 +123,10 @@ class ApiClient:
                     message = f"Falha de conexao ao acessar o endpoint '{endpoint}'."
 
                 raise ApiClientError(message) from error
-                    
+
             except requests.exceptions.HTTPError as error:
                 status_code: int | str = (
-                    error.response.status_code 
+                    error.response.status_code
                     if error.response is not None
                     else "desconhecido"
                 )
@@ -141,14 +147,13 @@ class ApiClient:
                 raise ApiClientError(
                     f"Erro HTTP ao acessar o endpoint '{endpoint}'. Status code: {status_code}."
                 ) from error
-            
+
             except requests.exceptions.JSONDecodeError as error:
                 raise ApiClientError(
                     f"Resposta invalida no endpoint '{endpoint}': o corpo nao contem JSON valido."
                 ) from error
-            
+
             except requests.exceptions.RequestException as error:
                 raise ApiClientError(
                     f"Erro inesperado de requisicao ao acessar o endpoint '{endpoint}'."
                 ) from error
-            
