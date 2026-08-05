@@ -84,3 +84,14 @@ jobs:
       
       - name: Run integration tests
         run: python -m pytest -m integration
+
+  docker-build:
+    needs: integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build Docker image
+        run: docker build -t weather-pipeline:ci .
