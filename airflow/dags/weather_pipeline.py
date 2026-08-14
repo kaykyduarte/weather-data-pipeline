@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 @dag(
     dag_id="weather_data_pipeline",
-    schedule=None,
+    schedule="0 * * * *",
     start_date=pendulum.datetime(2026, 8, 7, tz="UTC"),
     catchup=False,
     tags=["weather", "data-engineering"],
