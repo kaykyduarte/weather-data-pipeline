@@ -23,7 +23,11 @@ def weather_pipeline():
     def start_pipeline() -> None:
         logger.info("Starting weather_data_pipeline DAG.")
 
-    @task(retries=2, retry_delay=timedelta(seconds=30))
+    @task(
+        retries=2,
+        retry_delay=timedelta(seconds=30),
+        execution_timeout=timedelta(minutes=5),
+    )
     def run_weather_pipeline_task() -> dict[str, object]:
         logger.info("Running weather pipeline.")
 
