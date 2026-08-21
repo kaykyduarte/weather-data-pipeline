@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
     schedule="0 * * * *",
     start_date=pendulum.datetime(2026, 8, 7, tz="UTC"),
     catchup=False,
+    max_active_runs=1,
     tags=["weather", "data-engineering"],
 )
 def weather_pipeline():
