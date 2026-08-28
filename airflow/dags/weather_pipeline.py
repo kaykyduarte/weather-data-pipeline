@@ -55,6 +55,7 @@ def report_task_success(context: dict[str, Any]) -> None:
     start_date=pendulum.datetime(2026, 8, 7, tz="UTC"),
     catchup=False,
     max_active_runs=1,
+    dagrun_timeout=timedelta(minutes=20),
     tags=["weather", "data-engineering"],
 )
 def weather_pipeline():
