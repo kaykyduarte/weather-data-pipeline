@@ -49,7 +49,7 @@ jobs:
           docker run --rm \
             -v "$PWD/airflow/dags:/opt/airflow/dags:ro" \
             weather-airflow:ci \
-            python -c "from airflow.dag_processing.dagbag import DagBag; bag = DagBag(dag_folder='/opt/airflow/dags'); assert not bag.import_errors, bag.import_errors; assert bag.get_dag('weather_data_pipeline') is not None"
+            python -c "from airflow.dag_processing.dagbag import DagBag; bag = DagBag(dag_folder='/opt/airflow/dags'); assert not bag.import_errors, bag.import_errors; assert 'weather_data_pipeline' in bag.dags, bag.dags.keys()"
 
   integration:
     needs: test
