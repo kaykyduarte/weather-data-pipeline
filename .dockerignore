@@ -5,3 +5,8 @@ __pycache__/
 .pytest_cache/
 *.pyc
 tests/
+.ruff_cache/
+airflow/.env
+airflow/logs/
+airflow/config/airflow.cfg
+**/*.ipynb

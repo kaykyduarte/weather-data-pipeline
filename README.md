@@ -2,13 +2,17 @@
 
 [![CI](https://github.com/kaykyduarte/weather-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/kaykyduarte/weather-data-pipeline/actions/workflows/ci.yml)
 
-Pipeline em Python para coletar previsoes horarias da Open-Meteo, transformar a resposta em registros estruturados, validar qualidade dos dados e persistir o resultado em PostgreSQL com `UPSERT` idempotente.
+Pipeline em Python para coletar previsoes horarias da Open-Meteo, transformar a resposta em registros estruturados, validar qualidade dos dados e persistir o resultado em PostgreSQL com `UPSERT` idempotente. O projeto tambem possui automacao com Airflow usando `CeleryExecutor` e `Redis`.
 
 ## Tecnologias
 
 - Python 3.13
 - Requests
+- Apache Airflow 3.3
+- CeleryExecutor
+- Redis
 - PostgreSQL 18
+- PostgreSQL 16
 - psycopg
 - Docker / Docker Compose
 - pytest
@@ -48,7 +52,7 @@ Para executar o projeto localmente, o ambiente esperado e:
 - Docker
 - Docker Compose
 
-O projeto nao exige instalacao local do PostgreSQL no Windows ou no sistema host. O banco e fornecido pelo proprio `compose.yaml`, usando PostgreSQL 18 em container.
+O projeto nao exige instalacao local do PostgreSQL no sistema host. O banco de dados da aplicacao e fornecido pelo `compose.yaml`, usando PostgreSQL 18 em container.
 
 ## Arquitetura
 
@@ -60,8 +64,14 @@ O projeto e dividido em componentes pequenos e especializados:
 - `DatabaseClient`: testa conexao e executa `UPSERT` em lote
 - `WeatherPipeline`: orquestra API, transformacao, validacao e persistencia
 - `main.py`: ponto de entrada, observabilidade e exit codes
+- `Airflow Scheduler`: cria e coordena `Dag Runs`
+- `Redis`: atua como broker do `CeleryExecutor`
+- `Airflow Worker`: executa `run_weather_pipeline()`
+- `PostgreSQL 16`: armazena os metadados do Airflow
+- `PostgreSQL 18`: armazena os dados meteorologicos
+- `airflow/Dockerfile`: cria a imagem customizada com o codigo da aplicacao
 
-Fluxo conceitual:
+### Pipeline de dados
 
 ```mermaid
 flowchart TD
@@ -69,8 +79,22 @@ flowchart TD
     B --> C[WeatherTransformer]
     C --> D[JSONValidator]
     D -->|passed| E[DatabaseClient]
-    E --> F[PostgreSQL]
+    E --> F[PostgreSQL 18]
     D -->|failed| G[Encerra sem persistir]
+```
+
+### Orquestracao
+
+```mermaid
+flowchart TD
+    A["Airflow Scheduler"] --> B["Dag Run"]
+    A --> C["Redis Broker"]
+    C --> D["Airflow Worker"]
+    D --> E["Airflow API Server"]
+    E --> F["PostgreSQL 16"]
+    D --> G["run_weather_pipeline()"]
+    G --> H["Open-Meteo"]
+    G --> I["PostgreSQL 18"]
 ```
 
 ## Fluxo API -> transformacao -> validacao -> PostgreSQL
@@ -274,7 +298,7 @@ O projeto possui um `Dockerfile` para construir a aplicacao com:
 - codigo copiado apenas de `src/`
 - usuario nao-root para execucao
 
-### Compose
+### Compose da aplicacao
 
 O `compose.yaml` define:
 
@@ -295,38 +319,59 @@ O servico `weather_pipeline`:
 - sobrescreve `POSTGRES_HOST=postgres`
 - depende do banco com `service_healthy`
 
+### Compose do Airflow
+
+O `airflow/docker-compose.yaml` define a camada de orquestracao com:
+
+- `postgres:16` para os metadados do Airflow
+- `redis` como broker do Celery
+- `airflow-scheduler`
+- `airflow-worker`
+- `airflow-dag-processor`
+- `airflow-apiserver`
+- `airflow-triggerer`
+- imagem customizada via `airflow/Dockerfile`
+
 ## Estrutura do projeto
 
 ```text
 weather-data-pipeline/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── sql/
-│   └── 001_create_weather_forecasts.sql
-├── src/
-│   ├── api_client.py
-│   ├── config.py
-│   ├── database.py
-│   ├── json_validator.py
-│   ├── main.py
-│   ├── pipeline.py
-│   └── transformer.py
-├── tests/
-│   ├── integration/
-│   │   └── test_database_integration.py
-│   ├── test_api_client.py
-│   ├── test_config.py
-│   ├── test_database.py
-│   ├── test_json_validator.py
-│   ├── test_pipeline.py
-│   └── test_transformer.py
-├── compose.yaml
-├── Dockerfile
-├── pyproject.toml
-├── pytest.ini
-├── requirements-dev.txt
-└── requirements.txt
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml
+|-- .env.example
+|-- airflow/
+|   |-- .env.example
+|   |-- dags/
+|   |   `-- weather_pipeline.py
+|   |-- Dockerfile
+|   `-- docker-compose.yaml
+|-- sql/
+|   `-- 001_create_weather_forecasts.sql
+|-- src/
+|   |-- api_client.py
+|   |-- config.py
+|   |-- database.py
+|   |-- json_validator.py
+|   |-- main.py
+|   |-- pipeline.py
+|   `-- transformer.py
+|-- tests/
+|   |-- integration/
+|   |   `-- test_database_integration.py
+|   |-- test_api_client.py
+|   |-- test_config.py
+|   |-- test_database.py
+|   |-- test_json_validator.py
+|   |-- test_main.py
+|   |-- test_pipeline.py
+|   `-- test_transformer.py
+|-- compose.yaml
+|-- Dockerfile
+|-- pyproject.toml
+|-- pytest.ini
+|-- requirements-dev.txt
+`-- requirements.txt
 ```
 
 ## Testes
@@ -387,7 +432,7 @@ python -m pytest -m integration
 
 ## Continuous Integration (CI)
 
-O workflow em `.github/workflows/ci.yml` possui tres jobs:
+O workflow em `.github/workflows/ci.yml` possui quatro jobs:
 
 ### `test`
 
@@ -405,9 +450,18 @@ O workflow em `.github/workflows/ci.yml` possui tres jobs:
 - aplica a migration
 - roda `python -m pytest -m integration`
 
+### `airflow-validate`
+
+- depende de `test`
+- constroi a imagem de `airflow/Dockerfile`
+- monta `airflow/dags` em container somente leitura
+- valida importacoes com `DagBag`
+- confirma que a DAG `weather_data_pipeline` foi carregada
+
 ### `docker-build`
 
 - depende de `integration`
+- depende de `airflow-validate`
 - constroi a imagem local do projeto
 - usa a tag `weather-pipeline:ci`
 
@@ -458,11 +512,77 @@ Rodar a pipeline como execucao pontual:
 docker compose run --rm weather_pipeline
 ```
 
+## Executar com Airflow
+
+### 1. Criar os arquivos locais
+
+```powershell
+Copy-Item .env.example .env
+Copy-Item airflow/.env.example airflow/.env
+```
+
+### 2. Gerar uma Fernet Key
+
+```bash
+docker run --rm apache/airflow:3.3.0 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### 3. Gerar o segredo JWT
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Os valores gerados nesses dois passos devem substituir os placeholders correspondentes em `airflow/.env`.
+
+### 4. Criar o banco meteorologico e a rede compartilhada
+
+```bash
+docker compose up -d postgres
+```
+
+### 5. Inicializar o Airflow
+
+```powershell
+docker compose --env-file .\airflow\.env -f .\airflow\docker-compose.yaml up --build airflow-init
+```
+
+### 6. Subir os servicos
+
+```powershell
+docker compose --env-file .\airflow\.env -f .\airflow\docker-compose.yaml up -d
+```
+
+### 7. Acessar a interface
+
+Acesse [http://localhost:8080](http://localhost:8080) e ative a DAG `weather_data_pipeline`.
+
+O usuario e a senha da interface sao definidos por:
+
+- `_AIRFLOW_WWW_USER_USERNAME`
+- `_AIRFLOW_WWW_USER_PASSWORD`
+
+### Comportamento da DAG
+
+| Configuracao | Valor |
+| --- | --- |
+| Agendamento | `0 * * * *` - a cada hora |
+| Catchup | Desativado |
+| Dag Runs simultaneas | 1 |
+| Retries | 2, alem da tentativa inicial |
+| Timeout por tentativa | 5 minutos |
+| Timeout da Dag Run | 20 minutos |
+
 ## Variaveis de ambiente
 
-O projeto espera um `.env` local para execucao e um `.env.example` versionado como template sem segredos reais.
+O projeto utiliza dois arquivos locais de ambiente:
 
-### Banco
+- `.env`: configuracao da aplicacao e do PostgreSQL meteorologico
+- `airflow/.env`: configuracao e credenciais locais do Airflow
+
+Os arquivos `.env.example` e `airflow/.env.example` funcionam como templates versionados, sem segredos reais.
+
+### Banco da aplicacao
 
 ```env
 POSTGRES_HOST=localhost
@@ -479,6 +599,18 @@ API_BASE_URL=https://api.open-meteo.com
 API_TIMEOUT=10
 API_MAX_RETRIES=2
 API_BACKOFF_SECONDS=0.5
+```
+
+### Airflow
+
+```env
+AIRFLOW_IMAGE_NAME=weather-airflow:3.3.0
+AIRFLOW_UID=50000
+FERNET_KEY=replace_with_generated_fernet_key
+AIRFLOW__API_AUTH__JWT_SECRET=replace_with_random_jwt_secret
+AIRFLOW__API_AUTH__JWT_ISSUER=airflow
+_AIRFLOW_WWW_USER_USERNAME=airflow
+_AIRFLOW_WWW_USER_PASSWORD=change_me
 ```
 
 ## Decisoes arquiteturais
@@ -523,10 +655,14 @@ O banco nao e chamado se os dados nao passam no `JSONValidator`.
 
 O uso de `UPSERT` com chave unica composta evita duplicidade e permite reprocessamento seguro.
 
+### 7. Automacao desacoplada da aplicacao
+
+O Airflow orquestra a execucao, mas a logica principal continua concentrada em `run_weather_pipeline()`. Isso permite reuso local, via Docker ou por task do Airflow sem duplicar regra de negocio.
+
 ## Limitacoes atuais
 
-- A pipeline e executada de forma pontual. O projeto ainda nao possui scheduler, orquestrador ou mecanismo de execucao recorrente.
 - Os parametros meteorologicos e a localizacao consultada ainda sao definidos pela aplicacao. Ainda nao existe uma camada externa para cadastro dinamico de cidades, coordenadas ou colecoes de consultas.
+- A stack do Airflow foi projetada para desenvolvimento local e nao representa uma configuracao de producao.
 - A migration atual atende muito bem ao bootstrap de um banco novo, mas nao representa ainda uma estrategia completa de evolucao de schema para ambientes persistidos.
 - O CI foi desenhado deliberadamente para nao depender da Open-Meteo real em testes end-to-end. Isso deixa o pipeline de validacao mais estavel e previsivel, mas tambem significa que a integracao com a API externa nao e validada em cada execucao do GitHub Actions.
-- `executemany()` é adequado para os pequenos lotes atuais, especialmente lotes pequenos como as 24 linhas horarias. Para volumes de escala muito maior, essa provavelmente nao seria a estrategia final de carga.
+- `executemany()` e adequado para os pequenos lotes atuais, especialmente as 24 linhas horarias. Para volumes muito maiores, essa provavelmente nao seria a estrategia final de carga.

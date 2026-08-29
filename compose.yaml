@@ -18,6 +18,10 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+    networks:
+      default:
+        aliases:
+          - weather-postgres
 
   weather_pipeline:
     build:
@@ -36,5 +40,9 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  default:
+    name: weather-data-network
 
   
