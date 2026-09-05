@@ -3,12 +3,13 @@ import time
 from datetime import datetime
 from typing import Any
 
-from src.api_client import ApiClient, ApiClientError
-from src.config import ApiConfig, ConfigError, DatabaseConfig
-from src.database import DatabaseClient, DatabaseConnectionError, DatabaseWriteError
+from src.api_client import ApiClient
+from src.config import ApiConfig, DatabaseConfig
+from src.database import DatabaseClient
+from src.exceptions import DataQualityError, PipelineDomainError
 from src.json_validator import JSONValidator
-from src.pipeline import PipelineError, WeatherPipeline
-from src.transformer import WeatherTransformer, WeatherTransformError
+from src.pipeline import WeatherPipeline
+from src.transformer import WeatherTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,6 @@ def run_weather_pipeline() -> dict[str, Any]:
     api_client = ApiClient(
         base_url=api_config.base_url,
         timeout=api_config.timeout,
-        max_retries=api_config.max_retries,
-        backoff_seconds=api_config.backoff_seconds,
     )
     transformer = WeatherTransformer()
 
@@ -91,15 +90,15 @@ def main() -> int:
 
         return 0
 
-    except (
-        ConfigError,
-        ApiClientError,
-        WeatherTransformError,
-        PipelineError,
-        DatabaseConnectionError,
-        DatabaseWriteError,
-    ):
-        logger.exception("Falha tecnica durante execucao da pipeline.")
+    except DataQualityError:
+        logger.warning(
+            "Pipeline finished with a data quality failure.",
+            exc_info=True,
+        )
+        return 2
+
+    except PipelineDomainError:
+        logger.warning("Pipeline failed due to a techinical domain error.")
         return 1
 
     finally:

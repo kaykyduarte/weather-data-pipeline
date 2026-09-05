@@ -3,6 +3,7 @@ from typing import Any
 import psycopg
 
 from src.config import DatabaseConfig
+from src.exceptions import NonRetryableTechnicalError, RetryableTechnicalError
 
 UPSERT_WEATHER_FORECAST_SQL = """
 INSERT INTO weather_forecasts (
@@ -25,11 +26,19 @@ DO UPDATE SET
 """
 
 
-class DatabaseConnectionError(Exception):
+class DatabaseAuthenticationError(NonRetryableTechnicalError):
+    """Falha de autenticacao no banco de dados."""
+
+
+class DatabaseConnectionError(RetryableTechnicalError):
     """Erro de conexao com o banco de dados."""
 
 
-class DatabaseWriteError(Exception):
+class DatabaseQueryError(NonRetryableTechnicalError):
+    """Erro na query do banco de dados."""
+
+
+class DatabaseWriteError(NonRetryableTechnicalError):
     """Erro de escrita no banco de dados"""
 
 
@@ -53,9 +62,21 @@ class DatabaseClient:
             )
             return connection
 
-        except psycopg.Error as error:
+        except psycopg.errors.InvalidPassword as error:
+            raise DatabaseAuthenticationError(
+                f"Falha de autenticacao no banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.OperationalError as error:
             raise DatabaseConnectionError(
                 f"Falha ao conectar ao banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.Error as error:
+            raise NonRetryableTechnicalError(
+                f"Falha no banco '{self._config.dbname}' sem politica especifica "
                 f"em {self._config.host}:{self._config.port}."
             ) from error
 
@@ -68,14 +89,26 @@ class DatabaseClient:
                     result = cursor.fetchone()
 
             if result != (1,):
-                raise DatabaseConnectionError(
+                raise NonRetryableTechnicalError(
                     f"Teste de conexao ao banco '{self._config.dbname}' "
                     f"em {self._config.host}:{self._config.port} retornou resultado inesperado: {result}."
                 )
 
-        except psycopg.Error as error:
+        except psycopg.OperationalError as error:
             raise DatabaseConnectionError(
                 f"Falha ao testar conexao com o banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.errors.SyntaxError as error:
+            raise DatabaseQueryError(
+                f"Falha na query do banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.Error as error:
+            raise NonRetryableTechnicalError(
+                f"Falha no banco '{self._config.dbname}' sem politica especifica "
                 f"em {self._config.host}:{self._config.port}."
             ) from error
 
@@ -101,9 +134,21 @@ class DatabaseClient:
             with self._connect() as connection:
                 with connection.cursor() as cursor:
                     cursor.executemany(UPSERT_WEATHER_FORECAST_SQL, params_list)
-        except psycopg.Error as error:
+        except psycopg.IntegrityError as error:
             raise DatabaseWriteError(
                 f"Falha ao gravar previsoes no banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.OperationalError as error:
+            raise DatabaseConnectionError(
+                f"Erro durante a operacao no banco '{self._config.dbname}' "
+                f"em {self._config.host}:{self._config.port}."
+            ) from error
+
+        except psycopg.Error as error:
+            raise NonRetryableTechnicalError(
+                f"Erro do psycopg sem politica especifica ainda no banco {self._config.dbname} "
                 f"em {self._config.host}:{self._config.port}."
             ) from error
 

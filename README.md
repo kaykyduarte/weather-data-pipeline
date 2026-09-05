@@ -58,7 +58,7 @@ O projeto nao exige instalacao local do PostgreSQL no sistema host. O banco de d
 
 O projeto e dividido em componentes pequenos e especializados:
 
-- `ApiClient`: camada HTTP com retry, backoff exponencial, mensagens de erro de dominio e logs de retry
+- `ApiClient`: camada HTTP com validacao de resposta e classificacao de erros de dominio
 - `WeatherTransformer`: converte a resposta da Open-Meteo em registros estruturados
 - `JSONValidator`: aplica o Data Quality Gate sobre os registros transformados
 - `DatabaseClient`: testa conexao e executa `UPSERT` em lote
@@ -141,54 +141,39 @@ O `JSONValidator` valida o schema esperado do registro transformado e produz um 
 
 O `DatabaseClient` persiste os registros usando `UPSERT` em lote sobre a tabela `weather_forecasts`.
 
-## Retry + exponential backoff
+## Classificacao de falhas
 
-O `ApiClient` implementa retry com:
-
-- `timeout`
-- `max_retries`
-- `backoff_seconds`
-
-O numero total de tentativas e:
+O projeto converte excecoes de bibliotecas externas em uma hierarquia de erros de dominio:
 
 ```text
-max_retries + 1
+PipelineDomainError
+├── RetryableTechnicalError
+├── NonRetryableTechnicalError
+└── DataQualityError
 ```
 
-O atraso entre tentativas usa backoff exponencial:
+O `ApiClient` classifica falhas HTTP e de transporte desta forma:
 
 ```text
-delay = backoff_seconds * (2 ** (attempt - 1))
+Timeout / ConnectionError
+    → RetryableTechnicalError
+
+HTTP 5xx / 429
+    → RetryableTechnicalError
+
+HTTP 4xx
+    → NonRetryableTechnicalError
+
+JSON invalido
+    → DataQualityError
+
+RequestException desconhecida
+    → NonRetryableTechnicalError
 ```
 
-Exemplo com `backoff_seconds=0.5` e `max_retries=2`:
+O `DatabaseClient` segue a mesma taxonomia ao traduzir erros do Psycopg. A classificacao indica a natureza da falha; a integracao da orquestracao que decide entre nova tentativa ou falha imediata sera tratada separadamente.
 
-- tentativa 1 falha -> espera `0.5`
-- tentativa 2 falha -> espera `1.0`
-- tentativa 3 falha -> retries esgotados, erro final
-
-### Politica de retry
-
-O cliente repete tentativas em falhas transitorias, incluindo:
-
-- `Timeout`
-- `ConnectionError`
-- `HTTP 500`
-- `HTTP 502`
-- `HTTP 503`
-- `HTTP 504`
-
-Erros nao transitorios, como `HTTP 404`, falham imediatamente.
-
-### Observabilidade do retry
-
-Cada retry gera um `WARNING` estruturado, por exemplo:
-
-```text
-api_retry endpoint=/v1/forecast reason=Timeout next_attempt=2 total_attempts=3 delay_seconds=0.500
-```
-
-Isso ajuda a detectar instabilidade mesmo quando a chamada final termina com sucesso.
+Uma reprovacao do Data Quality Gate encerra a execucao sem persistir dados.
 
 ## Idempotencia / UPSERT
 
@@ -389,8 +374,7 @@ Cobertura principal:
   - falha de conexao
   - `HTTPError`
   - JSON invalido
-  - retry e backoff
-  - logs de retry
+  - classificacao de falhas tecnicas e de qualidade
 - `ApiConfig` e `DatabaseConfig`
   - parsing
   - variaveis ausentes
@@ -597,8 +581,6 @@ POSTGRES_PASSWORD=your_postgres_password_here
 ```env
 API_BASE_URL=https://api.open-meteo.com
 API_TIMEOUT=10
-API_MAX_RETRIES=2
-API_BACKOFF_SECONDS=0.5
 ```
 
 ### Airflow
@@ -630,14 +612,9 @@ O projeto ignora apenas `SIM117` no Ruff para preservar `with` aninhados quando 
 
 ### 3. Erros de dominio explicitos
 
-O projeto converte erros tecnicos em excecoes de dominio, por exemplo:
+As camadas da aplicacao usam `PipelineDomainError` como base para erros conhecidos e as categorias `RetryableTechnicalError`, `NonRetryableTechnicalError` e `DataQualityError` para comunicar a natureza da falha. Excecoes especificas de cada componente podem herdar dessas categorias para preservar o contexto do erro.
 
-- `ApiClientError`
-- `WeatherTransformError`
-- `DatabaseConnectionError`
-- `DatabaseWriteError`
-- `PipelineError`
-- `ConfigError`
+Isso permite que pontos de entrada tratem falhas conhecidas como uma categoria de dominio, sem depender de cada detalhe de HTTP, transformacao ou PostgreSQL.
 
 ### 4. Pipeline falha de forma semantica
 

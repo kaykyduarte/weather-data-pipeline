@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 
-from src.api_client import ApiClientError
+from src.exceptions import RetryableTechnicalError
 from src.main import main, run_weather_pipeline
 
 
@@ -29,8 +29,7 @@ def test_main_returns_zero_when_pipeline_succeeds(
     api_config = Mock()
     api_config.base_url = "https://api.open-meteo.com"
     api_config.timeout = 10
-    api_config.max_retries = 2
-    api_config.backoff_seconds = 0.5
+
     mock_api_config_from_env.return_value = api_config
 
     pipeline_instance = mock_weather_pipeline.return_value
@@ -82,8 +81,7 @@ def test_main_returns_two_when_data_quality_fails(
     api_config = Mock()
     api_config.base_url = "https://api.open-meteo.com"
     api_config.timeout = 10
-    api_config.max_retries = 2
-    api_config.backoff_seconds = 0.5
+
     mock_api_config_from_env.return_value = api_config
 
     pipeline_instance = mock_weather_pipeline.return_value
@@ -109,12 +107,12 @@ def test_main_returns_one_when_pipeline_raises_expected_error(
     api_config = Mock()
     api_config.base_url = "https://api.open-meteo.com"
     api_config.timeout = 10
-    api_config.max_retries = 2
-    api_config.backoff_seconds = 0.5
     mock_api_config_from_env.return_value = api_config
 
     pipeline_instance = mock_weather_pipeline.return_value
-    pipeline_instance.run.side_effect = ApiClientError("Falha simulada na API.")
+    pipeline_instance.run.side_effect = RetryableTechnicalError(
+        "Tempo excedido ao acessar API."
+    )
 
     result = main()
 
@@ -148,8 +146,6 @@ def test_run_weather_pipeline_returns_pipeline_report(
     api_config = Mock()
     api_config.base_url = "https://api.open-meteo.com"
     api_config.timeout = 10
-    api_config.max_retries = 2
-    api_config.backoff_seconds = 0.5
     mock_api_config_from_env.return_value = api_config
 
     pipeline_instance = mock_weather_pipeline.return_value
