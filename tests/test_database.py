@@ -8,9 +8,8 @@ from src.config import DatabaseConfig
 from src.database import (
     UPSERT_WEATHER_FORECAST_SQL,
     DatabaseClient,
-    DatabaseConnectionError,
-    DatabaseWriteError,
 )
+from src.exceptions import NonRetryableTechnicalError, RetryableTechnicalError
 
 
 def test_upsert_forecasts_returns_zero_for_empty_input() -> None:
@@ -112,90 +111,6 @@ def test_upsert_forecasts_maps_records_to_sql_batch() -> None:
     connection_mock.cursor.return_value.__exit__.assert_called_once()
 
 
-def test_upsert_forecasts_converts_psycopg_error_to_database_write_error() -> None:
-    records = [
-        {
-            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
-            "latitude": -23.5505,
-            "longitude": -46.6333,
-            "temperature_c": 18.5,
-            "relative_humidity_pct": 80,
-            "precipitation_mm": 0.0,
-            "wind_speed_kmh": 12.4,
-        },
-    ]
-    config = DatabaseConfig(
-        host="localhost",
-        port=5432,
-        dbname="weather_db",
-        user="weather_user",
-        password="secret",
-    )
-    client = DatabaseClient(config)
-
-    connection_mock = MagicMock()
-    cursor_mock = MagicMock()
-
-    connection_mock.__enter__.return_value = connection_mock
-    connection_mock.cursor.return_value.__enter__.return_value = cursor_mock
-
-    write_error = psycopg.Error("write failed")
-    cursor_mock.executemany.side_effect = write_error
-
-    with patch.object(client, "_connect", return_value=connection_mock) as mock_connect:
-        with pytest.raises(DatabaseWriteError) as exc_info:
-            client.upsert_forecasts(records)
-
-    message = str(exc_info.value)
-
-    assert config.dbname in message
-    assert config.host in message
-    assert str(config.port) in message
-    assert exc_info.value.__cause__ is write_error
-
-    mock_connect.assert_called_once_with()
-    cursor_mock.executemany.assert_called_once()
-    connection_mock.cursor.return_value.__exit__.assert_called_once()
-    connection_mock.__exit__.assert_called_once()
-
-
-def test_connection_converts_psycopg_error_to_database_connection_error() -> None:
-    config = DatabaseConfig(
-        host="localhost",
-        port=5432,
-        dbname="weather_db",
-        user="weather_user",
-        password="secret",
-    )
-    client = DatabaseClient(config)
-
-    connect_error = psycopg.Error("connection failed")
-
-    with patch(
-        "src.database.psycopg.connect",
-        side_effect=connect_error,
-    ) as mock_connect:
-        with pytest.raises(DatabaseConnectionError) as exc_info:
-            client.test_connection()
-
-    message = str(exc_info.value)
-
-    assert config.dbname in message
-    assert config.host in message
-    assert str(config.port) in message
-    assert config.password not in message
-    assert exc_info.value.__cause__ is connect_error
-
-    mock_connect.assert_called_once_with(
-        host=config.host,
-        port=config.port,
-        dbname=config.dbname,
-        user=config.user,
-        password=config.password,
-        connect_timeout=5,
-    )
-
-
 def test_connection_executes_select_one_and_closes_resources() -> None:
     config = DatabaseConfig(
         host="localhost",
@@ -225,3 +140,124 @@ def test_connection_executes_select_one_and_closes_resources() -> None:
 
     connection_mock.cursor.return_value.__exit__.assert_called_once()
     connection_mock.__exit__.assert_called_once()
+
+
+def test_upsert_raises_retryable_error_for_operational_error() -> None:
+    records = [
+        {
+            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
+            "latitude": -23.5505,
+            "longitude": -46.6333,
+            "temperature_c": 18.5,
+            "relative_humidity_pct": 80,
+            "precipitation_mm": 0.0,
+            "wind_speed_kmh": 12.4,
+        },
+    ]
+
+    original_error = psycopg.OperationalError("connection error")
+
+    config = DatabaseConfig(
+        host="localhost",
+        port=5432,
+        dbname="weather_db",
+        user="weather_user",
+        password="secret",
+    )
+    client = DatabaseClient(config)
+
+    connection_mock = MagicMock()
+    cursor_mock = MagicMock()
+
+    connection_mock.__enter__.return_value = connection_mock
+    connection_mock.cursor.return_value.__enter__.return_value = cursor_mock
+    cursor_mock.executemany.side_effect = original_error
+
+    with patch.object(client, "_connect", return_value=connection_mock) as mock_connect:
+        with pytest.raises(RetryableTechnicalError) as exc_info:
+            client.upsert_forecasts(records)
+
+    assert exc_info.value.__cause__ is original_error
+    assert mock_connect.call_count == 1
+    assert cursor_mock.executemany.call_count == 1
+
+
+def test_upsert_raises_non_retryable_error_for_integrity_error() -> None:
+    records = [
+        {
+            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
+            "latitude": -23.5505,
+            "longitude": -46.6333,
+            "temperature_c": 18.5,
+            "relative_humidity_pct": 80,
+            "precipitation_mm": 0.0,
+            "wind_speed_kmh": 12.4,
+        },
+    ]
+
+    original_error = psycopg.IntegrityError("constrait violation")
+
+    config = DatabaseConfig(
+        host="localhost",
+        port=5432,
+        dbname="weather_db",
+        user="weather_user",
+        password="secret",
+    )
+    client = DatabaseClient(config)
+
+    connection_mock = MagicMock()
+    cursor_mock = MagicMock()
+
+    connection_mock.__enter__.return_value = connection_mock
+    connection_mock.cursor.return_value.__enter__.return_value = cursor_mock
+    cursor_mock.executemany.side_effect = original_error
+
+    with patch.object(client, "_connect", return_value=connection_mock) as mock_connect:
+        with pytest.raises(NonRetryableTechnicalError) as exc_info:
+            client.upsert_forecasts(records)
+
+    assert exc_info.value.__cause__ is original_error
+    assert mock_connect.call_count == 1
+    assert cursor_mock.executemany.call_count == 1
+
+
+def test_upsert_raises_non_retryable_error_for_unspecified_psycopg_error() -> None:
+    records = [
+        {
+            "forecast_at": datetime(2026, 7, 29, 3, 0, tzinfo=UTC),
+            "latitude": -23.5505,
+            "longitude": -46.6333,
+            "temperature_c": 18.5,
+            "relative_humidity_pct": 80,
+            "precipitation_mm": 0.0,
+            "wind_speed_kmh": 12.4,
+        },
+    ]
+
+    original_error = psycopg.Error("unexpected database error")
+
+    config = DatabaseConfig(
+        host="localhost",
+        port=5432,
+        dbname="weather_db",
+        user="weather_user",
+        password="secret",
+    )
+    client = DatabaseClient(config)
+
+    connection_mock = MagicMock()
+    cursor_mock = MagicMock()
+
+    connection_mock.__enter__.return_value = connection_mock
+    connection_mock.cursor.return_value.__enter__.return_value = cursor_mock
+    cursor_mock.executemany.side_effect = original_error
+
+    with patch.object(client, "_connect", return_value=connection_mock) as mock_connect:
+        with pytest.raises(NonRetryableTechnicalError) as exc_info:
+            client.upsert_forecasts(records)
+
+    assert exc_info.value.__cause__ is original_error
+
+    mock_connect.assert_called_once_with()
+    cursor_mock.executemany.assert_called_once()
