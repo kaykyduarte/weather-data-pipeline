@@ -53,6 +53,7 @@ x-airflow-common:
   build:
     context: ..
     dockerfile: airflow/Dockerfile
+    target: runtime
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
@@ -213,6 +214,16 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+  
+  airflow-tests:
+    build:
+      context: ..
+      dockerfile: airflow/Dockerfile
+      target: test
+    environment:
+      PYTHONPATH: /opt/airflow:/opt/airflow/dags
+    profiles:
+      - test
 
   airflow-init:
     <<: *airflow-common

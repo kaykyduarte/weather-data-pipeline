@@ -2,11 +2,12 @@ from typing import Any
 
 from src.api_client import ApiClient
 from src.database import DatabaseClient
+from src.exceptions import DataQualityError
 from src.json_validator import JSONValidator
 from src.transformer import WeatherTransformer
 
 
-class PipelineError(Exception):
+class PipelineError(DataQualityError):
     """Erro geral da pipeline de clima"""
 
 

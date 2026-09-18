@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from src.exceptions import NonRetryableTechnicalError
 
-class ConfigError(Exception):
+
+class ConfigError(NonRetryableTechnicalError):
     """Erro de configuracao da aplicacao."""
 
 

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApiClient:
-    """Cliente simples para fazer requisicoes HTTP a uma API JSON."""
+    """Classe para fazer requisicoes HTTP a uma API."""
 
     def __init__(
         self,
@@ -22,12 +22,12 @@ class ApiClient:
         timeout: int = 10,
         headers: dict[str, str] | None = None,
     ) -> None:
-        """Inicializa o cliente com configuracoes permanentes.
+        """Inicializa o cliente com as configuracoes.
 
         Args:
-            base_url: URL base da API, como ``https://api.exemplo.com``.
+            base_url: URL base da API.
             timeout: Tempo limite padrao das requisicoes em segundos.
-            headers: Cabecalhos fixos enviados em todas as requisicoes.
+            headers: Cabecalhos fixos enviados a API.
         """
 
         self.base_url = base_url.rstrip("/")
@@ -35,11 +35,11 @@ class ApiClient:
         self.headers = headers or {}
 
     def get(self, endpoint: str, params: dict[str, Any] | None = None) -> ApiResponse:
-        """Busca dados em um endpoint da API.
+        """Busca dados no endpoint da API.
 
         Args:
-            endpoint: Caminho do recurso, como ``/users`` ou ``/products``.
-            params: Query params opcionais, como ``{"page": 1}``.
+            endpoint: Caminho do recurso.
+            params: Query params opcionais.
 
         Returns:
             Um ``dict`` ou uma ``list`` com o JSON retornado pela API.

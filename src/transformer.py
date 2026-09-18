@@ -2,8 +2,10 @@ from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from src.exceptions import DataQualityError
 
-class WeatherTransformError(Exception):
+
+class WeatherTransformError(DataQualityError):
     """Erro de transformacao da resposta da API"""
 
 
