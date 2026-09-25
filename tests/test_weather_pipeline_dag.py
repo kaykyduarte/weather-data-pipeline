@@ -328,7 +328,7 @@ def test_build_pipeline_report_preserves_error_after_recovery() -> None:
     }
 
     operational_results = [
-        {   
+        {
             "location": "Fortaleza",
             "status": "success",
             "attempts": 2,
@@ -375,4 +375,3 @@ def test_finalize_pipeline_report_raises_for_partial_failure() -> None:
         finalize_pipeline_report(report)
 
     assert "completed_with_failures" in str(exc_info.value)
-

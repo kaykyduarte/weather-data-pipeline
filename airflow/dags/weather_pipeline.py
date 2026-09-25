@@ -131,7 +131,7 @@ def report_task_success(context: dict[str, Any]) -> None:
         logger.warning(
             "operational_result_missing_metrics location=%s attempts=%s",
             location.name,
-            attempts
+            attempts,
         )
         transformed_records = None
         persisted_records = None
@@ -219,8 +219,7 @@ def build_pipeline_report(
     duration_seconds = (report_started_at - dag_started_at).total_seconds()
 
     states = {
-        operational_result.get("status")
-        for operational_result in operational_results
+        operational_result.get("status") for operational_result in operational_results
     }
 
     if "failed" in states:
@@ -266,14 +265,12 @@ def finalize_pipeline_report(report: dict[str, object]) -> None:
             status,
         )
         return
-        
+
     logger.error(
         "weather_data_pipeline did not finish successfully status=%s",
         status,
     )
-    raise AirflowFailException(
-        f"Weather data pipeline finished with status={status}."
-    )
+    raise AirflowFailException(f"Weather data pipeline finished with status={status}.")
 
 
 @dag(
@@ -335,7 +332,7 @@ def weather_pipeline():
             logger.warning(
                 "operational_result_missing location=%s map_index=%s",
                 location.name,
-                map_index
+                map_index,
             )
 
             operational_results.append(
@@ -372,7 +369,7 @@ def weather_pipeline():
     report = generate_report()
     finish = finish_pipeline(report)
 
-    start >> pipeline_result >> report >> finish 
+    start >> pipeline_result >> report >> finish
 
 
 weather_pipeline()
